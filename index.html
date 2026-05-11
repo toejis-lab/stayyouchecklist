@@ -13,7 +13,7 @@
 <!-- PWA 아이콘 (인라인 SVG) -->
 <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20180%20180%22%3E%3Crect%20width%3D%22180%22%20height%3D%22180%22%20rx%3D%2240%22%20fill%3D%22%235C7F6F%22%2F%3E%3Ctext%20x%3D%2290%22%20y%3D%22118%22%20font-family%3D%22-apple-system%2Csans-serif%22%20font-size%3D%2270%22%20font-weight%3D%22800%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ESC%3C%2Ftext%3E%3C%2Fsvg%3E">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20180%20180%22%3E%3Crect%20width%3D%22180%22%20height%3D%22180%22%20rx%3D%2240%22%20fill%3D%22%235C7F6F%22%2F%3E%3Ctext%20x%3D%2290%22%20y%3D%22118%22%20font-family%3D%22-apple-system%2Csans-serif%22%20font-size%3D%2270%22%20font-weight%3D%22800%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ESC%3C%2Ftext%3E%3C%2Fsvg%3E">
-<link id="manifestLink" rel="manifest">
+<link rel="manifest" href="manifest.webmanifest">
 
 <!-- Firebase SDK (실시간 동기화용) -->
 <script type="module">
@@ -4398,72 +4398,22 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       if(mask192) icons.push({src: mask192, sizes:'192x192', type:'image/png', purpose:'maskable'});
       if(mask512) icons.push({src: mask512, sizes:'512x512', type:'image/png', purpose:'maskable'});
 
-      const manifest = {
-        name: 'StayCheck — 펜션 업무 체크',
-        short_name: 'StayCheck',
-        description: '펜션 직원·관리자용 업무 체크리스트',
-        start_url: window.location.pathname,
-        scope: window.location.pathname.replace(/\/[^/]*$/,'/'),
-        display: 'standalone',
-        display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
-        orientation: 'portrait',
-        background_color: '#F5F3EE',
-        theme_color: '#5C7F6F',
-        lang: 'ko',
-        icons: icons
-      };
-      const blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
-      const url = URL.createObjectURL(blob);
-      const link = document.getElementById('manifestLink');
-      if(link) link.setAttribute('href', url);
+      // manifest는 정적 파일(manifest.webmanifest)에서 로드되므로 동적 생성 불필요
+      // 동적으로 생성한 아이콘은 파비콘으로만 사용 (PWA 아이콘은 manifest 파일이 처리)
     }catch(e){
-      console.warn('manifest 생성 실패', e);
+      console.warn('아이콘 생성 실패', e);
     }
   })();
 
   // 2) service worker 등록 (오프라인 캐시)
   // file:// 프로토콜에서는 동작 안 하므로 https 또는 localhost에서만 등록
+  // 같은 폴더의 sw.js 외부 파일로 등록해야 PWA 설치 가능 (Blob URL은 보안상 거부됨)
   if('serviceWorker' in navigator && window.location.protocol !== 'file:'){
-    const swCode = `
-      const CACHE = 'staycheck-v5-staff-dayoff';
-      self.addEventListener('install', (e)=>{ self.skipWaiting(); });
-      self.addEventListener('activate', (e)=>{ e.waitUntil(self.clients.claim()); });
-      self.addEventListener('fetch', (e)=>{
-        const req = e.request;
-        if(req.method !== 'GET') return;
-        if(req.url.indexOf('mymemory.translated.net') !== -1) return;
-        // Firebase 관련 요청은 SW가 건드리지 않음 (실시간 통신 보호)
-        if(req.url.indexOf('firestore.googleapis.com') !== -1) return;
-        if(req.url.indexOf('firebasestorage.googleapis.com') !== -1) return;
-        if(req.url.indexOf('firebaseapp.com') !== -1) return;
-        if(req.url.indexOf('googleapis.com') !== -1) return;
-        if(req.url.indexOf('gstatic.com') !== -1) return;
-        e.respondWith(
-          caches.match(req).then(hit=>{
-            if(hit) return hit;
-            return fetch(req).then(res=>{
-              try{
-                const u = new URL(req.url);
-                if(u.origin === self.location.origin && res.ok){
-                  const clone = res.clone();
-                  caches.open(CACHE).then(c=>c.put(req, clone));
-                }
-              }catch(_){}
-              return res;
-            }).catch(()=>{
-              if(req.mode === 'navigate'){
-                return caches.match(self.location.origin + self.registration.scope) || new Response('offline');
-              }
-              return new Response('offline', {status:503});
-            });
-          })
-        );
-      });
-    `;
     try{
-      const swBlob = new Blob([swCode], {type:'application/javascript'});
-      const swUrl = URL.createObjectURL(swBlob);
-      navigator.serviceWorker.register(swUrl, {scope: window.location.pathname.replace(/\/[^/]*$/,'/')})
+      // 현재 페이지가 있는 폴더 기준 상대경로
+      const scope = window.location.pathname.replace(/\/[^/]*$/,'/');
+      const swPath = scope + 'sw.js';
+      navigator.serviceWorker.register(swPath, {scope: scope})
         .then(()=>{
           if('caches' in window){
             caches.open('staycheck-v5-staff-dayoff').then(c=>{
@@ -4475,7 +4425,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
           console.warn('SW 등록 실패 (앱 동작에는 영향 없음)', err);
         });
     }catch(e){
-      console.warn('SW Blob 생성 실패', e);
+      console.warn('SW 등록 시도 실패', e);
     }
   }
 })();
