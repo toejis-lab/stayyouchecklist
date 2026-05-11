@@ -1585,7 +1585,7 @@ const PhotoDB = (function(){
 
   async function get(id){
     const db = await openDB();
-    // 로컬 캐시 우선
+    // 로컬 캐시 우선 (직원 본인 폰: 자기가 찍은 사진은 IDB에 dataURL로 있음)
     const local = await new Promise((resolve, reject)=>{
       const tx = db.transaction(STORE, 'readonly');
       const req = tx.objectStore(STORE).get(id);
@@ -1593,27 +1593,20 @@ const PhotoDB = (function(){
       req.onerror = ()=>reject(req.error);
     });
     if(local) return local;
-    // 캐시 미스 → Firebase Storage에서 다운로드
+    // 캐시 미스 (사장님 폰 등 다른 기기): Firebase Storage URL을 직접 반환
+    // ⚠️ fetch로 dataURL 변환하지 않음 - CORS 문제 우회
+    // 브라우저는 <img>/background-image의 cross-origin 이미지는 허용함
     if(window.__firebase && window.__firebase.ready){
       try{
         const fb = window.__firebase;
         const r = fb.storageRef(fb.storage, 'photos/'+id+'.jpg');
         const url = await fb.getDownloadURL(r);
-        // fetch해서 dataUrl로 변환 후 IDB 캐시에 저장
-        const res = await fetch(url);
-        const blob = await res.blob();
-        const dataUrl = await new Promise((rs, rj)=>{
-          const fr = new FileReader();
-          fr.onload = ()=>rs(fr.result);
-          fr.onerror = ()=>rj(fr.error);
-          fr.readAsDataURL(blob);
-        });
-        // 백그라운드 캐싱
+        // URL만 캐싱 (실제 이미지 데이터는 Firebase CDN이 캐싱해줌)
         try{
           const tx = db.transaction(STORE, 'readwrite');
-          tx.objectStore(STORE).put({id, dataUrl, savedAt:Date.now()});
+          tx.objectStore(STORE).put({id, dataUrl:url, savedAt:Date.now(), isUrl:true});
         }catch(_){}
-        return dataUrl;
+        return url;
       }catch(e){
         // Firebase에 없거나 권한 없음
         return null;
@@ -4254,7 +4247,11 @@ async function exportData(){
     try{
       const all = await PhotoDB.getAll();
       all.forEach(item=>{
-        exportObj.photos[item.id] = item.dataUrl;
+        // URL 캐시 항목은 백업 불가(다른 기기에서 못 씀) → 제외
+        if(item.isUrl) return;
+        if(typeof item.dataUrl === 'string' && item.dataUrl.startsWith('data:')){
+          exportObj.photos[item.id] = item.dataUrl;
+        }
       });
     }catch(e){
       console.warn('photo export fail', e);
