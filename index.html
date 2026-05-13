@@ -1399,6 +1399,22 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:var(--ink);}
   </div>
 </div>
 
+<!-- 종료 확인 (뒤로가기) -->
+<div class="modal-bg" id="modalExitConfirm">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <div class="modal-title" data-t="exit_title">앱 종료</div>
+      <button class="modal-close" onclick="cancelExitConfirm()">✕</button>
+    </div>
+    <p class="subtle" data-t="exit_message" style="margin:6px 0 16px 0;">앱을 종료하시겠어요?</p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="cancelExitConfirm()" data-t="exit_cancel">계속 사용</button>
+      <button class="btn btn-primary btn-block" onclick="confirmExitApp()" data-t="exit_confirm">종료</button>
+    </div>
+  </div>
+</div>
+
 <!-- 업무 추가/수정 -->
 <div class="modal-bg" id="modalTask">
   <div class="modal">
@@ -1810,6 +1826,11 @@ const KO_TH_DICT = {
   '청소':'ทำความสะอาด',
   '수영장 점검':'ตรวจสระว่ายน้ำ',
   '수영장':'สระว่ายน้ำ',
+  '수영장 백워시':'ล้างย้อนสระว่ายน้ำ',
+  '수영장 청소':'ทำความสะอาดสระว่ายน้ำ',
+  '수영장 소독':'ฆ่าเชื้อสระว่ายน้ำ',
+  '백워시':'ล้างย้อน',
+  '소독':'ฆ่าเชื้อ',
   '쓰레기 정리':'จัดการขยะ',
   '쓰레기':'ขยะ',
   '어메니티 보충':'เติมของใช้ในห้อง',
@@ -1967,6 +1988,11 @@ const I18N = {
     confirm_delete_shop:'매장의 모든 직원과 업무가 함께 삭제됩니다.\n계속하시겠어요?',
     name_required:'이름을 입력해 주세요',
     pin_duplicate:'이미 사용 중인 PIN입니다',
+    exit_title:'앱 종료',
+    exit_message:'앱을 종료하시겠어요?',
+    exit_cancel:'계속 사용',
+    exit_confirm:'종료',
+    pool_split_done:'수영장 점검이 백워시·청소·소독 3개 업무로 추가되었습니다',
     today:'오늘',
     yesterday:'어제',
     days_ago_suffix:'일 전',
@@ -2091,6 +2117,11 @@ const I18N = {
     confirm_delete_shop:'พนักงานและงานทั้งหมดในสาขาจะถูกลบไปด้วย\nต้องการดำเนินการต่อ?',
     name_required:'กรุณาใส่ชื่อ',
     pin_duplicate:'PIN นี้ถูกใช้แล้ว',
+    exit_title:'ออกจากแอป',
+    exit_message:'ต้องการออกจากแอปหรือไม่?',
+    exit_cancel:'ใช้งานต่อ',
+    exit_confirm:'ออก',
+    pool_split_done:'เพิ่มงานสระว่ายน้ำ 3 รายการ (ล้างย้อน, ทำความสะอาด, ฆ่าเชื้อ) แล้ว',
     today:'วันนี้',
     yesterday:'เมื่อวาน',
     days_ago_suffix:'วันที่แล้ว',
@@ -2332,6 +2363,7 @@ function loadData(){
       if(!DATA.adminPin) DATA.adminPin = '0000';
       if(!DATA.checks) DATA.checks = {};
       DATA.staff = (DATA.staff||[]).map(s=>({...s, dayoffs: Array.isArray(s.dayoffs)?s.dayoffs:[]}));
+      migratePoolCheckTasks();
       migratePhotosToIDB();
       autoCleanOldSpecials();
     } else {
@@ -2498,10 +2530,15 @@ function seedInitialData(){
     ],
     tasks:[
       {id:'tk_1', shopId:'shop_1', type:'fixed', nameKo:'객실 청소', nameTh:'ทำความสะอาดห้อง', assignTo:'all'},
-      {id:'tk_2', shopId:'shop_1', type:'fixed', nameKo:'수영장 점검', nameTh:'ตรวจสระว่ายน้ำ', assignTo:'all'},
+      {id:'tk_2a', shopId:'shop_1', type:'fixed', nameKo:'수영장 백워시', nameTh:'ล้างย้อนสระว่ายน้ำ', assignTo:'all'},
+      {id:'tk_2b', shopId:'shop_1', type:'fixed', nameKo:'수영장 청소', nameTh:'ทำความสะอาดสระว่ายน้ำ', assignTo:'all'},
+      {id:'tk_2c', shopId:'shop_1', type:'fixed', nameKo:'수영장 소독', nameTh:'ฆ่าเชื้อสระว่ายน้ำ', assignTo:'all'},
       {id:'tk_3', shopId:'shop_1', type:'fixed', nameKo:'쓰레기 정리', nameTh:'จัดการขยะ', assignTo:'all'},
       {id:'tk_4', shopId:'shop_1', type:'fixed', nameKo:'어메니티 보충', nameTh:'เติมของใช้ในห้อง', assignTo:'all'},
       {id:'tk_5', shopId:'shop_2', type:'fixed', nameKo:'객실 청소', nameTh:'ทำความสะอาดห้อง', assignTo:'all'},
+      {id:'tk_5a', shopId:'shop_2', type:'fixed', nameKo:'수영장 백워시', nameTh:'ล้างย้อนสระว่ายน้ำ', assignTo:'all'},
+      {id:'tk_5b', shopId:'shop_2', type:'fixed', nameKo:'수영장 청소', nameTh:'ทำความสะอาดสระว่ายน้ำ', assignTo:'all'},
+      {id:'tk_5c', shopId:'shop_2', type:'fixed', nameKo:'수영장 소독', nameTh:'ฆ่าเชื้อสระว่ายน้ำ', assignTo:'all'},
       {id:'tk_6', shopId:'shop_2', type:'fixed', nameKo:'마당 정리', nameTh:'จัดสวน', assignTo:'all'}
     ],
     checks:{},
@@ -4201,6 +4238,36 @@ async function saveTask(){
   const assignTo = document.getElementById('taskAssign').value;
   const date = document.getElementById('taskDate').value;
   if(!koVal){toast(t('name_required'));return;}
+
+  // ✨ 특수 처리: 고정 업무로 '수영장 점검' 추가/수정 시 백워시/청소/소독 3개로 자동 분리
+  // (스테이유 풀빌라, 스테이 느긋하게 모두 동일 적용)
+  if(modalTaskType==='fixed' && isPoolCheckName(koVal)){
+    const subTasks = [
+      {ko:'수영장 백워시', th:'ล้างย้อนสระว่ายน้ำ'},
+      {ko:'수영장 청소',   th:'ทำความสะอาดสระว่ายน้ำ'},
+      {ko:'수영장 소독',   th:'ฆ่าเชื้อสระว่ายน้ำ'}
+    ];
+    if(modalTaskId){
+      // 수정 모드 → 기존 항목을 3개로 교체
+      const idx = DATA.tasks.findIndex(tk=>tk.id===modalTaskId);
+      const baseShop = idx>=0 ? DATA.tasks[idx].shopId : editShopId;
+      DATA.tasks = DATA.tasks.filter(tk=>tk.id!==modalTaskId);
+      subTasks.forEach(s=>{
+        DATA.tasks.push({id:uid('tk'), shopId:baseShop, type:'fixed', nameKo:s.ko, nameTh:s.th, assignTo, date:null});
+      });
+    } else {
+      // 추가 모드 → 3개 모두 새로 추가
+      subTasks.forEach(s=>{
+        DATA.tasks.push({id:uid('tk'), shopId:editShopId, type:'fixed', nameKo:s.ko, nameTh:s.th, assignTo, date:null});
+      });
+    }
+    saveData();
+    closeModal('modalTask');
+    toast(t('pool_split_done') || '수영장 점검이 백워시·청소·소독 3개 업무로 추가되었습니다');
+    renderShopDetail();
+    return;
+  }
+
   // 태국어 비어있으면 즉시 번역 시도
   if(!thVal){
     setTranslateStatus('loading');
@@ -4222,6 +4289,53 @@ async function saveTask(){
   closeModal('modalTask');
   toast(t('saved'));
   renderShopDetail();
+}
+
+// '수영장 점검'으로 인식되는 이름 판단 (공백/표기 흔들림 허용)
+function isPoolCheckName(name){
+  if(!name) return false;
+  const normalized = String(name).replace(/\s+/g,'').toLowerCase();
+  // 매칭: 수영장점검, 풀점검, pool check 등
+  return normalized==='수영장점검'
+      || normalized==='풀점검'
+      || normalized==='poolcheck'
+      || normalized==='수영장check';
+}
+
+// 기존 저장 데이터에 '수영장 점검'이 남아있으면 백워시/청소/소독 3개로 자동 분리
+function migratePoolCheckTasks(){
+  if(!Array.isArray(DATA.tasks)) return;
+  const subSpec = [
+    {ko:'수영장 백워시', th:'ล้างย้อนสระว่ายน้ำ'},
+    {ko:'수영장 청소',   th:'ทำความสะอาดสระว่ายน้ำ'},
+    {ko:'수영장 소독',   th:'ฆ่าเชื้อสระว่ายน้ำ'}
+  ];
+  const oldTasks = DATA.tasks;
+  const newTasks = [];
+  let migrated = false;
+  for(const tk of oldTasks){
+    if(tk.type==='fixed' && isPoolCheckName(tk.nameKo)){
+      migrated = true;
+      const baseAssign = tk.assignTo || 'all';
+      subSpec.forEach(s=>{
+        newTasks.push({
+          id: uid('tk'),
+          shopId: tk.shopId,
+          type: 'fixed',
+          nameKo: s.ko,
+          nameTh: s.th,
+          assignTo: baseAssign,
+          date: null
+        });
+      });
+    } else {
+      newTasks.push(tk);
+    }
+  }
+  if(migrated){
+    DATA.tasks = newTasks;
+    try{ saveData(); }catch(_){}
+  }
 }
 function deleteCurrentTask(){
   if(!modalTaskId) return;
@@ -4767,6 +4881,79 @@ document.addEventListener('keydown', (e)=>{
     closeLightbox();
   }
 });
+
+// ═══════════════════════════════════════════════════════
+// 📱 모바일 뒤로가기 → 종료 확인 모달
+// ═══════════════════════════════════════════════════════
+// 핸드폰의 뒤로가기 버튼(또는 제스처) 누르면 바로 앱이 닫혀버리는 문제 해결.
+// history에 더미 상태를 push해 두고, popstate가 발생하면 종료 확인 모달을 띄움.
+// "계속 사용" → 더미 상태 다시 push (계속 가로채기)
+// "종료" → 한 번 더 뒤로가서 실제로 페이지를 떠남
+(function setupBackButtonGuard(){
+  let exitArmed = false;     // 종료 확인 진행 중인지
+  let userChoseExit = false; // 사용자가 '종료'를 선택했는지
+
+  function pushGuardState(){
+    try{ history.pushState({sc_guard:true}, ''); }catch(_){}
+  }
+
+  // 모달이 열려있으면 모달 먼저 닫기, 아니면 종료 확인
+  window.addEventListener('popstate', function(e){
+    if(userChoseExit){
+      // '종료' 버튼 눌러서 실제로 뒤로가는 중 — 가로채지 않음
+      return;
+    }
+    // 1) 열려있는 모달이 있으면 그것부터 닫기 (뒤로가기로 모달 닫기)
+    const openModals = document.querySelectorAll('.modal-bg.show');
+    if(openModals.length){
+      // 종료 확인 모달 자체는 별도 처리
+      const exitModal = document.getElementById('modalExitConfirm');
+      if(exitModal && exitModal.classList.contains('show')){
+        // 종료 확인 모달이 열려있던 상태 → 그냥 닫고 가드 다시 push
+        exitModal.classList.remove('show');
+        exitArmed = false;
+        pushGuardState();
+        return;
+      }
+      // 일반 모달 닫고 가드 다시 push
+      openModals.forEach(m=>m.classList.remove('show'));
+      if(typeof closeLightbox==='function'){ try{ closeLightbox(); }catch(_){} }
+      pushGuardState();
+      return;
+    }
+    // 2) 모달 없음 → 종료 확인 모달 표시
+    if(!exitArmed){
+      exitArmed = true;
+      const m = document.getElementById('modalExitConfirm');
+      if(m) m.classList.add('show');
+      // 가드 상태 다시 쌓아두기 (모달 자체가 뒤로가기 한 번 더 받으면 닫히도록)
+      pushGuardState();
+    }
+  });
+
+  // 종료 확인 모달의 버튼들이 호출하는 함수 (전역으로 노출)
+  window.confirmExitApp = function(){
+    userChoseExit = true;
+    const m = document.getElementById('modalExitConfirm');
+    if(m) m.classList.remove('show');
+    // 실제 종료: 히스토리에 쌓아둔 가드 상태들을 pop하면서 첫 진입 페이지를 떠남
+    // PWA standalone 모드에서는 window.close()도 시도
+    try{ history.back(); }catch(_){}
+    setTimeout(()=>{
+      // 일부 환경에서는 history.back으로도 안 닫힐 수 있어 fallback
+      try{ window.close(); }catch(_){}
+    }, 50);
+  };
+  window.cancelExitConfirm = function(){
+    exitArmed = false;
+    const m = document.getElementById('modalExitConfirm');
+    if(m) m.classList.remove('show');
+    // 가드 상태는 이미 popstate에서 다시 push 했으므로 그대로 둠
+  };
+
+  // 최초 가드 상태 1회 push (페이지 로드 직후 뒤로가기를 한 번 가로챌 수 있도록)
+  pushGuardState();
+})();
 </script>
 </body>
 </html>
